@@ -94,6 +94,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
       port: process.env.PORT === undefined ? 3000 : +process.env.PORT
     },
     optimizeDeps: {
+      include: ['clsx'],
       exclude: ['path']
     }
   };
