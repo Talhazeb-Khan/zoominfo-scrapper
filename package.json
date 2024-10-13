@@ -83,8 +83,7 @@
             "x64"
           ]
         }
-      ],
-      "signAndEditExecutable": false
+      ]
     },
     "mac": {
       "target": "dmg",
@@ -113,6 +112,7 @@
       "createStartMenuShortcut": true,
       "shortcutName": "ZoomInfo Data Scrapper"
     },
-    "forceCodeSigning": false
+    "forceCodeSigning": false,
+    "publish": null
   }
 }
