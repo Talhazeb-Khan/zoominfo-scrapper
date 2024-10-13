@@ -7,7 +7,7 @@ import isDev from 'electron-is-dev';
 import axios from 'axios';
 import fs from 'fs';
 import { stringify } from 'csv-stringify';
-import storage from 'node-persist'; // Using node-persist instead of electron-store
+// import storage from 'node-persist'; // Using node-persist instead of electron-store
 import { ScrapeData } from './preload';
 
 let mainWindow: BrowserWindow | null = null;
@@ -20,28 +20,28 @@ let delayCancel: (() => void) | null = null;
 let currentPage = 0;
 let resultsCollected = 0;
 
-// Initialize node-persist storage
-async function initializeStorage() {
-  await storage.init({ dir: path.join(app.getPath('userData'), 'scraper-app-state') });
-}
+// // Initialize node-persist storage
+// async function initializeStorage() {
+//   await storage.init({ dir: path.join(app.getPath('userData'), 'scraper-app-state') });
+// }
 
-async function loadAppState() {
-  const state = await storage.getItem('appState') || {
-    isScraping: false,
-    isPaused: false,
-    currentPage: 0,
-    resultsCollected: 0,
-    scrapeData: null,
-  };
-  ({ isScraping, isPaused, scrapeData, currentPage, resultsCollected } = state as any);
-}
+// async function loadAppState() {
+//   const state = await storage.getItem('appState') || {
+//     isScraping: false,
+//     isPaused: false,
+//     currentPage: 0,
+//     resultsCollected: 0,
+//     scrapeData: null,
+//   };
+//   ({ isScraping, isPaused, scrapeData, currentPage, resultsCollected } = state as any);
+// }
 
-async function saveAppState() {
-  await storage.setItem('appState', { isScraping, isPaused, scrapeData, currentPage, resultsCollected });
-}
+// async function saveAppState() {
+//   await storage.setItem('appState', { isScraping, isPaused, scrapeData, currentPage, resultsCollected });
+// }
 
 async function createWindow() {
-  await initializeStorage(); // Initialize storage
+  // await initializeStorage(); // Initialize storage
 
   const iconName = process.platform === 'darwin' ? 'logo.icns' : 'logo.ico';
   let iconPath: string;
@@ -71,7 +71,7 @@ async function createWindow() {
 
   mainWindow.loadURL(url);
 
-  await loadAppState();
+  // await loadAppState();
   if (isScraping) {
     mainWindow.webContents.once('did-finish-load', () => {
       mainWindow?.webContents.send('restore-app-state', {
@@ -95,14 +95,14 @@ async function createWindow() {
     currentPage = data.startIdx || 0;
     resultsCollected = 0;
 
-    await saveAppState();
+    // await saveAppState();
 
     startScraping();
   });
 
   ipcMain.on('pause-scraping', async () => {
     isPaused = true;
-    await saveAppState();
+    // await saveAppState();
   });
 
   ipcMain.on('resume-scraping', () => {
@@ -157,7 +157,7 @@ async function createWindow() {
   powerMonitor.on('suspend', async () => {
     if (isScraping && !isPaused) {
       isPaused = true;
-      await saveAppState();
+      // await saveAppState();
       mainWindow?.webContents.send('auto-pause');
     }
   });
@@ -219,7 +219,7 @@ async function startScraping() {
   } catch (error: any) {
     mainWindow?.webContents.send('error', `Error: ${error.message}`);
   } finally {
-    await saveAppState(); 
+    // await saveAppState(); 
   }
 }
 
@@ -410,7 +410,7 @@ async function handleContactSearch(
       if (!isScraping) {
         break;
       }
-      saveAppState(); // Save state after each page
+      // saveAppState(); // Save state after each page
     } catch (error: any) {
       console.log('Error in person search:', error);
       if (error.response && [401, 403].includes(error.response.status)) {
