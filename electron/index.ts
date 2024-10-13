@@ -17,8 +17,8 @@ let scrapeData: ScrapeData | null = null;
 let wasStopped = false;
 let delayCancel: (() => void) | null = null;
 
-let currentPage = 0;
-let resultsCollected = 0;
+// let currentPage = 0;
+// let resultsCollected = 0;
 
 // // Initialize node-persist storage
 // async function initializeStorage() {
@@ -72,15 +72,15 @@ async function createWindow() {
   mainWindow.loadURL(url);
 
   // await loadAppState();
-  if (isScraping) {
-    mainWindow.webContents.once('did-finish-load', () => {
-      mainWindow?.webContents.send('restore-app-state', {
-        scrapeData,
-        currentPage,
-        resultsCollected,
-      });
-    });
-  }
+  // if (isScraping) {
+  //   mainWindow.webContents.once('did-finish-load', () => {
+  //     mainWindow?.webContents.send('restore-app-state', {
+  //       scrapeData,
+  //       currentPage,
+  //       resultsCollected,
+  //     });
+  //   });
+  // }
 
   ipcMain.on('start-scraping', async (event, data: ScrapeData) => {
     if (isScraping) {
@@ -92,8 +92,8 @@ async function createWindow() {
     wasStopped = false;
     scrapeData = data;
 
-    currentPage = data.startIdx || 0;
-    resultsCollected = 0;
+    // currentPage = data.startIdx || 0;
+    // resultsCollected = 0;
 
     // await saveAppState();
 
@@ -158,14 +158,14 @@ async function createWindow() {
     if (isScraping && !isPaused) {
       isPaused = true;
       // await saveAppState();
-      mainWindow?.webContents.send('auto-pause');
+      // mainWindow?.webContents.send('auto-pause');
     }
   });
 
   powerMonitor.on('resume', () => {
     if (isScraping && isPaused) {
       isPaused = false;
-      mainWindow?.webContents.send('auto-resume');
+      // mainWindow?.webContents.send('auto-resume');
       startScraping();
     }
   });
@@ -176,11 +176,11 @@ async function createWindow() {
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
 
-async function autoPauseOrResume() {
-  while (isPaused) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-}
+// async function autoPauseOrResume() {
+//   while (isPaused) {
+//     await new Promise((resolve) => setTimeout(resolve, 1000));
+//   }
+// }
 
 async function startScraping() {
   if (!scrapeData) return;
@@ -238,7 +238,7 @@ async function scrapeDataFunction(
   while (isScraping && resultsCollected < totalResults) {
 
     // Check if we should pause due to sleep/wake cycle
-    await autoPauseOrResume();
+    // await autoPauseOrResume();
 
     if (isPaused) {
       await new Promise((resolve) => {
@@ -342,7 +342,7 @@ async function handleContactSearch(
   while (isScraping && personIds.length < totalResults) {
 
     // Check if we should pause due to sleep/wake cycle
-    await autoPauseOrResume();
+    // await autoPauseOrResume();
     
     if (isPaused) {
       await new Promise((resolve) => {
