@@ -1,14 +1,14 @@
 // electron/index.ts
 
-import { app, BrowserWindow, ipcMain, nativeTheme, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme, shell, dialog, powerMonitor } from 'electron';
 import { join } from 'path';
-import path from "node:path";
+import path from 'node:path';
 import isDev from 'electron-is-dev';
 import axios from 'axios';
 import fs from 'fs';
 import { stringify } from 'csv-stringify';
+import storage from 'node-persist'; // Using node-persist instead of electron-store
 import { ScrapeData } from './preload';
-
 
 let mainWindow: BrowserWindow | null = null;
 let isScraping = false;
@@ -17,8 +17,31 @@ let scrapeData: ScrapeData | null = null;
 let wasStopped = false;
 let delayCancel: (() => void) | null = null;
 
+let currentPage = 0;
+let resultsCollected = 0;
 
-function createWindow() {
+// Initialize node-persist storage
+async function initializeStorage() {
+  await storage.init({ dir: path.join(app.getPath('userData'), 'scraper-app-state') });
+}
+
+async function loadAppState() {
+  const state = await storage.getItem('appState') || {
+    isScraping: false,
+    isPaused: false,
+    currentPage: 0,
+    resultsCollected: 0,
+    scrapeData: null,
+  };
+  ({ isScraping, isPaused, scrapeData, currentPage, resultsCollected } = state as any);
+}
+
+async function saveAppState() {
+  await storage.setItem('appState', { isScraping, isPaused, scrapeData, currentPage, resultsCollected });
+}
+
+async function createWindow() {
+  await initializeStorage(); // Initialize storage
 
   const iconName = process.platform === 'darwin' ? 'logo.icns' : 'logo.ico';
   let iconPath: string;
@@ -40,7 +63,6 @@ function createWindow() {
     },
   });
 
-  // Remove the default menu bar
   mainWindow.setMenuBarVisibility(false);
 
   const url = isDev
@@ -49,7 +71,18 @@ function createWindow() {
 
   mainWindow.loadURL(url);
 
-  ipcMain.on('start-scraping', (event, data: ScrapeData) => {
+  await loadAppState();
+  if (isScraping) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow?.webContents.send('restore-app-state', {
+        scrapeData,
+        currentPage,
+        resultsCollected,
+      });
+    });
+  }
+
+  ipcMain.on('start-scraping', async (event, data: ScrapeData) => {
     if (isScraping) {
       event.sender.send('error', 'Scraping is already in progress.');
       return;
@@ -58,11 +91,18 @@ function createWindow() {
     isPaused = false;
     wasStopped = false;
     scrapeData = data;
+
+    currentPage = data.startIdx || 0;
+    resultsCollected = 0;
+
+    await saveAppState();
+
     startScraping();
   });
 
-  ipcMain.on('pause-scraping', () => {
+  ipcMain.on('pause-scraping', async () => {
     isPaused = true;
+    await saveAppState();
   });
 
   ipcMain.on('resume-scraping', () => {
@@ -76,7 +116,6 @@ function createWindow() {
     isPaused = false;
     wasStopped = true;
 
-    // Cancel any pending delays
     if (delayCancel) {
       delayCancel();
       delayCancel = null;
@@ -115,17 +154,38 @@ function createWindow() {
     return fs.existsSync(filePath);
   });
 
+  powerMonitor.on('suspend', async () => {
+    if (isScraping && !isPaused) {
+      isPaused = true;
+      await saveAppState();
+      mainWindow?.webContents.send('auto-pause');
+    }
+  });
+
+  powerMonitor.on('resume', () => {
+    if (isScraping && isPaused) {
+      isPaused = false;
+      mainWindow?.webContents.send('auto-resume');
+      startScraping();
+    }
+  });
+
   nativeTheme.themeSource = 'dark';
 }
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
 
+async function autoPauseOrResume() {
+  while (isPaused) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
 async function startScraping() {
   if (!scrapeData) return;
-  const { apiType, cookies, payload, totalResults, savePath } = scrapeData;
+  const { apiType, cookies, payload, totalResults, startIdx, savePath } = scrapeData;
 
-  // Extract headers from cookies
   let headers;
   try {
     headers = extractHeadersFromCookies(cookies);
@@ -143,9 +203,9 @@ async function startScraping() {
 
   try {
     if (apiType === 'Contact Search') {
-      await handleContactSearch(apiType, payload, headers, totalResults, csvStringifier);
+      await handleContactSearch(apiType, payload, headers, totalResults, startIdx, csvStringifier);
     } else {
-      await scrapeDataFunction(apiType, payload, headers, totalResults, csvStringifier);
+      await scrapeDataFunction(apiType, payload, headers, totalResults, startIdx, csvStringifier);
     }
 
     csvStringifier.end();
@@ -158,6 +218,8 @@ async function startScraping() {
     }
   } catch (error: any) {
     mainWindow?.webContents.send('error', `Error: ${error.message}`);
+  } finally {
+    await saveAppState(); 
   }
 }
 
@@ -166,13 +228,18 @@ async function scrapeDataFunction(
   payload: any,
   headers: any,
   totalResults: number,
+  startIdx: number,
   csvStringifier: any
 ) {
   const apiUrl = getApiUrl(apiType);
   let resultsCollected = 0;
-  let page = 1;
+  let page = Math.ceil(startIdx / 25) + 1;
 
   while (isScraping && resultsCollected < totalResults) {
+
+    // Check if we should pause due to sleep/wake cycle
+    await autoPauseOrResume();
+
     if (isPaused) {
       await new Promise((resolve) => {
         const interval = setInterval(() => {
@@ -256,6 +323,7 @@ async function handleContactSearch(
   payload: any,
   headers: any,
   totalResults: number,
+  startIdx: number,
   csvStringifier: any
 ) {
   const personSearchUrl = 'https://app.zoominfo.com/profiles/graphql/personSearch';
@@ -264,7 +332,7 @@ async function handleContactSearch(
   let personIds: string[] = [];
   let socialUrlsMap: Record<string, any> = {};
   let resultsCollected = 0;
-  let page = 1;
+  let page = Math.ceil(startIdx / 25) + 1;
 
   const totalPersonSearchCalls = Math.ceil(totalResults / 25);
   const totalApiCalls = totalPersonSearchCalls + totalResults; // PersonSearch calls + viewContacts calls
@@ -272,6 +340,10 @@ async function handleContactSearch(
 
   // Step 1: Fetch person IDs
   while (isScraping && personIds.length < totalResults) {
+
+    // Check if we should pause due to sleep/wake cycle
+    await autoPauseOrResume();
+    
     if (isPaused) {
       await new Promise((resolve) => {
         const interval = setInterval(() => {
@@ -338,6 +410,7 @@ async function handleContactSearch(
       if (!isScraping) {
         break;
       }
+      saveAppState(); // Save state after each page
     } catch (error: any) {
       console.log('Error in person search:', error);
       if (error.response && [401, 403].includes(error.response.status)) {

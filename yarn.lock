@@ -644,6 +644,13 @@
   resolved "https://registry.npmjs.org/@types/ms/-/ms-0.7.31.tgz"
   integrity sha512-iiUgKzV9AuaEkZqkOLDIvlQiL6ltuZd9tGcW3gwpnX8JbuiuhFlEGmmFXEXkN50Cvq7Os88IY2v0dkDqXYWVgA==
 
+"@types/node-persist@^3.1.8":
+  version "3.1.8"
+  resolved "https://registry.npmjs.org/@types/node-persist/-/node-persist-3.1.8.tgz"
+  integrity sha512-QLidg6/SadZYPrTKxtxL1A85XBoQlG40bhoMdhu6DH6+eNCMr2j+RGfFZ9I9+IY8W/PDwQonJ+iBWD62jZjMfg==
+  dependencies:
+    "@types/node" "*"
+
 "@types/node@*", "@types/node@^17.0.22":
   version "17.0.22"
   resolved "https://registry.npmjs.org/@types/node/-/node-17.0.22.tgz"
@@ -3023,6 +3030,11 @@ natural-compare@^1.4.0:
   version "1.4.0"
   resolved "https://registry.npmjs.org/natural-compare/-/natural-compare-1.4.0.tgz"
   integrity sha1-Sr6/7tdUHywnrPspvbvRXI1bpPc= sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
+
+node-persist@^4.0.3:
+  version "4.0.3"
+  resolved "https://registry.npmjs.org/node-persist/-/node-persist-4.0.3.tgz"
+  integrity sha512-0gDy86TNShzfbpUKFbH8KJFjoovuUgVh/FqL4jrJWYz0cET76Uohl118utG/Ft6wl4sHOPXdRSY7eXH5kVY06w==
 
 node-releases@^2.0.2:
   version "2.0.2"

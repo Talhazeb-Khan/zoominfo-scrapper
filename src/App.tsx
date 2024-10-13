@@ -32,14 +32,17 @@ function App() {
   const [modalMessage, setModalMessage] = useState<string>('');
   const [modalType, setModalType] = useState<'success' | 'error' | 'info'>('info');
 
+  const [startIndex, setStartIndex] = useState<string>('0');
+
   useEffect(() => {
     setCanStart(
       cookiesText.trim() !== '' &&
       payloadText.trim() !== '' &&
       savePath.trim() !== '' &&
-      resultsCount.trim() !== ''
+      resultsCount.trim() !== '' &&
+      startIndex.trim() !== ''
     );
-  }, [cookiesText, payloadText, savePath, resultsCount]);
+  }, [cookiesText, payloadText, savePath, resultsCount, startIndex]);
 
   useEffect(() => {
     const handleProgressUpdate = (data: ProgressUpdate) => {
@@ -83,11 +86,25 @@ function App() {
       }
     };
 
+    const handleAutoPause = () => {
+      setIsPaused(true);
+      showModal('Auto-Pause', 'The system has paused scraping due to sleep mode.', 'info');
+    };
+  
+    const handleAutoResume = () => {
+      setIsPaused(false);
+      showModal('Auto-Resume', 'Scraping has resumed as the system woke up.', 'info');
+    };
+
     window.electronAPI.onProgressUpdate(handleProgressUpdate);
     window.electronAPI.onScrapingFinished(handleScrapingFinished);
     window.electronAPI.onScrapingStopped(handleScrapingStopped);
     window.electronAPI.onError(handleError);
     window.electronAPI.onRequestNewCookies(handleRequestNewCookies);
+
+    window.electronAPI.onAutoPause(handleAutoPause);
+    window.electronAPI.onAutoResume(handleAutoResume);
+
 
     return () => {
       // Clean up event listeners if necessary
@@ -127,10 +144,16 @@ function App() {
       try {
         const cookies = JSON.parse(cookiesText);
         const payload = JSON.parse(payloadText);
-        const totalResults = parseInt(resultsCount);
+        const totalResults = parseInt(resultsCount, 10); // Ensure parsing as number
+        const startIdx = parseInt(startIndex, 10); // Ensure parsing as number
 
         if (isNaN(totalResults) || totalResults <= 0) {
           showModal('Error', 'Please enter a valid number for "Number of Results".', 'error');
+          return;
+        }
+
+        if (isNaN(startIdx) || startIdx < 0) {
+          showModal('Error', 'Please enter a valid start index.', 'error');
           return;
         }
 
@@ -139,6 +162,7 @@ function App() {
           cookies,
           payload,
           totalResults,
+          startIdx,
           savePath,
           headers: {}
         };
@@ -151,6 +175,7 @@ function App() {
       }
     }
   };
+
 
   const handlePauseResume = () => {
     if (isPaused) {
@@ -187,6 +212,9 @@ function App() {
     'Scoops Search',
   ];
 
+  const handleClearCookies = () => setCookiesText('');
+  const handleClearPayload = () => setPayloadText('');
+  
   return (
     <div className="min-h-screen w-full bg-gray-50 items-center p-6">
       <h1 className="text-2xl font-bold mb-8 text-center">
@@ -215,11 +243,14 @@ function App() {
           </Select>
         </div>
 
-        {/* Cookies Textarea */}
+        {/* Cookies Textarea with Clear Button */}
         <div>
-          <label className="block text-md font-medium mb-2">
-            Paste Cookies (JSON Format)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-md font-medium">Paste Cookies (JSON Format)</label>
+            <Button onClick={handleClearCookies} size="sm" color="red">
+              Clear
+            </Button>
+          </div>
           <Textarea
             value={cookiesText}
             onChange={(e) => setCookiesText(e.target.value)}
@@ -227,16 +258,19 @@ function App() {
             className="w-full"
             rows={6}
             nonce=""
-            onResize={() => { }}
-            onResizeCapture={() => { }}
+            onResize={() => {}}
+            onResizeCapture={() => {}}
           />
         </div>
 
-        {/* Payload Textarea */}
+        {/* Payload Textarea with Clear Button */}
         <div>
-          <label className="block text-md font-medium mb-2">
-            Paste Payload (JSON Format)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-md font-medium">Paste Payload (JSON Format)</label>
+            <Button onClick={handleClearPayload} size="sm" color="red">
+              Clear
+            </Button>
+          </div>
           <Textarea
             value={payloadText}
             onChange={(e) => setPayloadText(e.target.value)}
@@ -262,6 +296,22 @@ function App() {
             onResizeCapture={() => { }}
           />
         </div>
+
+        {/* Start Index */}
+        <div>
+          <label className="block text-md font-medium mb-2">Start Index</label>
+          <Input
+            type="number"
+            min="0"
+            value={startIndex}
+            onChange={(e) => setStartIndex(e.target.value)} // Fallback to '0' if empty
+            className="w-full"
+            nonce=""
+            onResize={() => { }}
+            onResizeCapture={() => { }}
+          />
+        </div>
+
 
         {/* Save Location */}
         <div className="flex items-center space-x-4">
