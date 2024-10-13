@@ -83,7 +83,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "signAndEditExecutable": false
     },
     "mac": {
       "target": "dmg",
